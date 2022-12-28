@@ -1,14 +1,28 @@
 require("dotenv").config();
 const express = require("express");
+const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const path = require("path");
 const port = 3000;
 
+const checkJwt = async (req, res, next) => {
+  try {
+    if (req.headers.authorization) {
+      const response = await fetch("https://kpi.eu.auth0.com/pem");
+      const publicKey = await response.text();
+
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, publicKey);
+      next()
+    }
+  } catch (err) {
+    res.status(403).json({ success: false, redirect: "/" });
+  }
+};
+
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-const refreshTokens = []; //{userId, refreshToken}
 
 app.get("/", async (req, res) => {
   if (req.headers.authorization) {
@@ -26,6 +40,25 @@ app.get("/", async (req, res) => {
     });
   }
   res.sendFile(path.join(__dirname + "/index.html"));
+});
+
+app.get("/profile", (req, res) => {
+  res.sendFile(path.join(__dirname + "/profile.html"));
+});
+
+app.get("/api/profile", checkJwt, async (req, res) => {
+  const token = req.headers.authorization;
+  // Роблю запит на дані користувача
+  const response = await fetch("https://kpi.eu.auth0.com/userinfo", {
+    headers: {
+      Authorization: token,
+    },
+  });
+  const user = await response.json();
+  return res.json({
+    success: true,
+    user,
+  });
 });
 
 app.get("/logout", (req, res) => {

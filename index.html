@@ -137,12 +137,16 @@
             if (username) {
                 const mainHolder = document.getElementById("main-holder");
                 const loginHeader = document.getElementById("login-header");
+                const profileLink = document.createElement("a");
+                profileLink.href = "/profile";
+                profileLink.innerHTML="Profile"
 
                 loginForm.remove();
                 loginErrorMsg.remove();
                 loginHeader.remove();
 
                 mainHolder.append(`Hello ${username}`);
+                mainHolder.append(profileLink);
                 logoutLink.style.opacity = 1;
             }
         });
