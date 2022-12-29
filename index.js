@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
+var cors = require("cors");
 const path = require("path");
 const port = 3000;
 
@@ -13,7 +14,7 @@ const checkJwt = async (req, res, next) => {
 
       const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, publicKey);
-      next()
+      next();
     }
   } catch (err) {
     res.status(403).json({ success: false, redirect: "/" });
@@ -24,29 +25,50 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.get("/", async (req, res) => {
-  if (req.headers.authorization) {
-    const token = req.headers.authorization;
-    // Роблю запит на дані користувача
-    const response = await fetch("https://kpi.eu.auth0.com/userinfo", {
-      headers: {
-        Authorization: token,
-      },
-    });
-    const user = await response.json();
-    return res.json({
-      username: user.name,
-      logout: "http://localhost:3000/logout",
-    });
-  }
-  res.sendFile(path.join(__dirname + "/index.html"));
+app.use(cors({ origin: "*" }));
+
+app.get("/login", async (req, res) => {
+  res.redirect(
+    301,
+    `https://kpi.eu.auth0.com/authorize?client_id=JIvCO5c2IBHlAe2patn6l6q5H35qxti0&redirect_uri=http://localhost:3000&response_type=code&response_mode=query&scope=${process.env.SCOPE}`
+  );
 });
 
-app.get("/profile", (req, res) => {
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname + "/profile.html"));
 });
 
-app.get("/api/profile", checkJwt, async (req, res) => {
+app.get("/api/login", async (req, res) => {
+  const { code } = req.query;
+  const data = {
+    code,
+    grant_type: process.env.GRANT_TYPE,
+    redirect_uri: "http://localhost:3000",
+    client_id: process.env.CLIENT_ID,
+    client_secret: process.env.CLIENT_SECRET,
+  };
+
+  const response = await fetch("https://kpi.eu.auth0.com/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(data),
+  });
+  if (response.status === 200) {
+    const data = await response.json();
+    const { access_token, refresh_token, expires_in } = data;
+    res.cookie("refreshToken", refresh_token, {
+      maxAge: expires_in,
+      httpOnly: true,
+    });
+    res.json({ success: true, access_token });
+    return;
+  }
+  res.json({ success: false, redirect: "/login" });
+});
+
+app.get("/api/profile", async (req, res) => {
   const token = req.headers.authorization;
   // Роблю запит на дані користувача
   const response = await fetch("https://kpi.eu.auth0.com/userinfo", {
@@ -65,40 +87,6 @@ app.get("/logout", (req, res) => {
   // sessions.destroy(req, res);
   res.cookie("refreshToken", "", { maxAge: 0, httpOnly: true });
   res.redirect("/");
-});
-
-app.post("/api/login", async (req, res) => {
-  const { login, password } = req.body;
-
-  const data = {
-    audience: process.env.AUDIENCE,
-    grant_type: process.env.GRANT_TYPE,
-    client_id: process.env.CLIENT_ID,
-    client_secret: process.env.CLIENT_SECRET,
-    realm: process.env.REALM,
-    scope: process.env.SCOPE,
-    username: login,
-    password: password,
-  };
-
-  const response = await fetch("https://kpi.eu.auth0.com/oauth/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams(data),
-  });
-
-  if (response.status === 200) {
-    const { access_token, refresh_token, expires_in } = await response.json();
-    res.cookie("refreshToken", refresh_token, {
-      maxAge: expires_in,
-      httpOnly: true,
-    });
-    res.json({ success: true, access_token });
-    return;
-  }
-  res.status(400).json(await response.json());
 });
 
 app.listen(port, () => {

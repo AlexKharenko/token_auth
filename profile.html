@@ -48,15 +48,35 @@
     const session = sessionStorage.getItem('session');
 
     let token;
+    const main = document.querySelector("main")
 
     try {
         token = JSON.parse(session).access_token;
     } catch (e) { }
 
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+    const noCode = async () => {
+        window.location.href = "/login"
+    }
+    const noToken = async () => {
+        try {
+            console.log(`http://localhost:3000/api/login?code=${code}`)
+            const { data } = await axios(`http://localhost:3000/api/login?code=${code}`)
+            if (data.success) {
+                sessionStorage.setItem('session', JSON.stringify(data));
+                location.reload();
+            }
+            if (data.redirect) {
+                window.location.href = data.redirect
+            }
+        } catch (err) { console.error(err) }
+    }
+
     const mainFunc = async () => {
         const response = await fetch('/api/profile', {
             headers: {
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
             }
         })
         const data = await response.json()
@@ -69,21 +89,37 @@
                 <div>${updated_at}</div>
                 <div>${email}</div>
             `;
+            const logoutLink = document.createElement("a");
+            logoutLink.id="log-out-link"
+            logoutLink.href="/logout"
+            logoutLink.innerText="Logout"
+            logoutLink.addEventListener("click", (e) => {
+                e.preventDefault();
+                sessionStorage.removeItem('session');
+                location.reload();
+            });
+            main.prepend(logoutLink)
+
         }
         else if (data && !data.success) {
             const { redirect } = data;
             if (redirect) {
                 window.location.href = redirect
             }
+            const logoutLink = document.getElementById("log-out-link")
+            logoutLink.remove()
         }
     }
     if (token) {
         mainFunc()
     }
-
-    else {
-        window.location.href = "/"
+    else if (!code) {
+        noCode()
     }
+    else {
+        noToken()
+    }
+
 
 </script>
 
