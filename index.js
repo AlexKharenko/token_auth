@@ -1,24 +1,30 @@
 require("dotenv").config();
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const { auth } = require('express-oauth2-jwt-bearer');
 const bodyParser = require("body-parser");
 const path = require("path");
 const port = 3000;
 
-const checkJwt = async (req, res, next) => {
-  try {
-    if (req.headers.authorization) {
-      const response = await fetch("https://kpi.eu.auth0.com/pem");
-      const publicKey = await response.text();
+const checkJwt = auth({
+  audience: 'https://kpi.eu.auth0.com/api/v2/',
+  issuerBaseURL: 'https://kpi.eu.auth0.com/',
+});
 
-      const token = req.headers.authorization.split(" ")[1];
-      jwt.verify(token, publicKey);
-      next()
-    }
-  } catch (err) {
-    res.status(403).json({ success: false, redirect: "/" });
-  }
-};
+// const checkJwt = async (req, res, next) => {
+//   try {
+//     if (req.headers.authorization) {
+//       const response = await fetch("https://kpi.eu.auth0.com/pem");
+//       const publicKey = await response.text();
+
+//       const token = req.headers.authorization.split(" ")[1];
+//       jwt.verify(token, publicKey);
+//       next()
+//     }
+//   } catch (err) {
+//     res.status(403).json({ success: false, redirect: "/" });
+//   }
+// };
 
 const app = express();
 app.use(bodyParser.json());
